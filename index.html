@@ -119,6 +119,12 @@ footer{text-align:center;color:var(--mute);padding:36px 0 110px;font-size:14px}
 .visit>*{position:relative;z-index:1}
 .vp{position:absolute!important;bottom:-20px;z-index:0!important;pointer-events:none;animation:rise2 linear infinite;opacity:0}
 @keyframes rise2{0%{transform:translateY(0) scale(.6);opacity:0}20%{opacity:.8}100%{transform:translateY(-330px) scale(1.2) rotate(30deg);opacity:0}}
+
+/* own media */
+.bg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.2s}.bg img.on{opacity:1}
+.logo img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.sp{height:0;border-radius:20px;background-size:cover;background-position:center;transition:height .5s;margin-top:6px}.sp.on{height:180px}
+.visit>.vbg{position:absolute;inset:0;z-index:0;width:100%;height:100%;object-fit:cover;opacity:.45;background-size:cover;background-position:center}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -150,6 +156,7 @@ footer{text-align:center;color:var(--mute);padding:36px 0 110px;font-size:14px}
     <h2>Our services</h2>
     <p class="sub">Tap + to book any service on WhatsApp.</p>
     <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="sp" id="sp"></div>
     <div id="list"></div>
   </section>
 
@@ -172,7 +179,22 @@ footer{text-align:center;color:var(--mute);padding:36px 0 110px;font-size:14px}
 <script>
 /* ===== EDIT THESE: business details ===== */
 const C={
-  videos:[],                            // add video URLs here, e.g. ["https://yourhost.com/hair.mp4"]
+  /* ===== YOUR OWN PHOTOS & VIDEOS =====
+     Put the files in "images" and "videos" folders next to index.html.
+     If a file is missing, the page automatically shows the animation instead. */
+  media:{
+    logo:"images/logo.png",
+    hero:["videos/hero1.mp4","videos/hero2.mp4","videos/hero3.mp4","images/hero1.jpg"],   // videos and photos both work, they play in order
+    moods:{
+      "Tired":"images/tired.jpg",
+      "Celebrating":"images/celebrating.jpg",
+      "Need a reset":"images/reset.jpg",
+      "Feeling bold":"images/bold.jpg",
+      "Just because":"images/because.jpg"
+    },
+    services:{"Hair":"images/hair.jpg","Nails":"images/nails.jpg","Skin":"images/skin.jpg","Bridal":"images/bridal.jpg"},
+    hello:"videos/salon.mp4"                // Come say hello card: a video or a photo (images/salon.jpg)
+  },
 
   phone:"254700000000",                 // WhatsApp number, no + or spaces
   instagram:"https://instagram.com/joybeautyparlour",
@@ -211,7 +233,8 @@ const S={
  "Bridal":[["Bridal makeup","Look like yourself, only more radiant","KSh 8,000"],["Bride + party package","Everyone gorgeous, one booking","Ask us"]]
 };
 $("tabs").innerHTML=Object.keys(S).map((k,i)=>`<button class="tab" role="tab" aria-selected="${i==0}" data-k="${k}">${k}</button>`).join("");
-function show(k){$("list").innerHTML=S[k].map(s=>`<div class="svc"><div><b>${s[0]}</b><span>${s[1]}</span></div><div class="pr">${s[2]}</div><a href="${wa("Hi! I'd like to book: "+s[0].replace(/&amp;/g,"&"))}" target="_blank" rel="noopener" aria-label="Book ${s[0]}">+</a></div>`).join("");
+let curTab="Hair",SP={};
+function show(k){curTab=k;const u=SP[k];$("sp").style.backgroundImage=u?`url("${u}")`:"none";$("sp").classList.toggle("on",!!u);$("list").innerHTML=S[k].map(s=>`<div class="svc"><div><b>${s[0]}</b><span>${s[1]}</span></div><div class="pr">${s[2]}</div><a href="${wa("Hi! I'd like to book: "+s[0].replace(/&amp;/g,"&"))}" target="_blank" rel="noopener" aria-label="Book ${s[0]}">+</a></div>`).join("");
 document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected",t.dataset.k==k))}
 $("tabs").onclick=e=>{if(e.target.dataset.k)show(e.target.dataset.k)};show("Hair");
 
@@ -230,20 +253,25 @@ $("links").onclick=e=>{const a=e.target.closest("a.lk");if(!a)return;const u=a.g
 if(u[0]=="#")return;e.preventDefault();a.classList.add("go");setTimeout(()=>{a.classList.remove("go");window.open(u,"_blank","noopener")||(location.href=u)},220)};
 $("dir").href=C.maps;
 
-/* hero background: videos if provided, otherwise animated scenes; auto-changes */
-(function(){const bg=$("bg"),names=["Hair","Nails","Skin","Bridal"];let n=0,els=[],cur=-1,t;
+/* hero background: your videos/photos if the files exist, otherwise animated scenes; auto-changes */
+(function(){const bg=$("bg"),names=["Hair","Nails","Skin","Bridal"];let els=[],n=0,cur=-1,t;
 const rm=matchMedia("(prefers-reduced-motion:reduce)").matches;
-if(C.videos.length){els=C.videos.map(u=>{const v=document.createElement("video");v.muted=true;v.playsInline=true;v.preload="auto";v.src=u;bg.appendChild(v);return v});n=els.length;
-els.forEach(v=>v.onerror=()=>{v.dead=1})}
-else{n=4;els=names.map((x,i)=>{const d=document.createElement("div");d.className="scene s"+i;d.textContent=x;bg.appendChild(d);return d})}
+const probe=u=>new Promise(r=>{const isV=/\.(mp4|webm|mov|m4v)$/i.test(u),e=document.createElement(isV?"video":"img");let d=0;
+const fin=ok=>{if(d)return;d=1;clearTimeout(tm);r(ok?e:null)};const tm=setTimeout(()=>fin(0),7000);
+if(isV){e.muted=true;e.playsInline=true;e.preload="auto";e.onloadedmetadata=()=>fin(1)}else e.onload=()=>fin(1);e.onerror=()=>fin(0);e.src=u});
+function start(){n=els.length;els.forEach(e=>bg.appendChild(e));
 $("dots").innerHTML=els.map(()=>"<i></i>").join("");
 function go(i){clearTimeout(t);if(cur>=0){els[cur].classList.remove("on");if(els[cur].pause)els[cur].pause()}
-cur=i%n;const e=els[cur];if(e.dead){return go(cur+1)}e.classList.add("on");
+cur=i%n;const e=els[cur];e.classList.add("on");
 document.querySelectorAll("#dots i").forEach((d,k)=>d.classList.toggle("on",k==cur));
-if(e.play){e.currentTime=0;e.play().catch(()=>{});e.onended=()=>go(cur+1);t=setTimeout(()=>go(cur+1),12000)}else t=setTimeout(()=>go(cur+1),6000)}
+if(e.play){e.currentTime=0;e.play().catch(()=>{});e.onended=()=>go(cur+1);t=setTimeout(()=>go(cur+1),15000)}else t=setTimeout(()=>go(cur+1),6000)}
 go(0);
 if(!rm)for(let i=0;i<14;i++){const p=document.createElement("span");p.className="spark";p.textContent=["✨","💖","✦"][i%3];
-p.style.cssText=`left:${Math.random()*100}%;bottom:${Math.random()*30}px;font-size:${12+Math.random()*14}px;animation-duration:${6+Math.random()*6}s;animation-delay:${-Math.random()*10}s`;bg.appendChild(p)}})();
+p.style.cssText=`left:${Math.random()*100}%;bottom:${Math.random()*30}px;font-size:${12+Math.random()*14}px;animation-duration:${6+Math.random()*6}s;animation-delay:${-Math.random()*10}s`;bg.appendChild(p)}}
+Promise.all((C.media.hero||[]).map(probe)).then(list=>{els=list.filter(Boolean);
+if(!els.length)els=names.map((x,i)=>{const d=document.createElement("div");d.className="scene s"+i;d.textContent=x;return d});
+start()});
+window.probeMedia=probe})();
 
 /* visit section: reveal on scroll + highlight today */
 (function(){const d=new Date(new Date().toLocaleString("en-US",{timeZone:"Africa/Nairobi"})).getDay();
@@ -251,7 +279,7 @@ document.querySelector(`.visit .row[data-d="${d==0?"sun":"mon"}"]`).classList.ad
 const io=new IntersectionObserver(es=>es.forEach(x=>{if(x.isIntersecting){x.target.classList.add("in");io.unobserve(x.target)}}),{threshold:.25});
 document.querySelectorAll(".rv").forEach(x=>io.observe(x))})();
 
-/* mood scenes: illustrated by default; put your own photo URLs in C.photos to replace them */
+/* mood scenes: illustrated by default; your own photos from C.media.moods replace them */
 const SC={
 Tired:`<rect width="400" height="260" fill="#4b1d46"/><circle cx="330" cy="50" r="38" fill="#f4b45c" opacity=".25"/><rect x="40" y="150" width="320" height="34" rx="12" fill="#f7e3d9"/><rect x="60" y="184" width="14" height="40" fill="#8d5a44"/><rect x="326" y="184" width="14" height="40" fill="#8d5a44"/><circle cx="92" cy="132" r="22" fill="#c98a6b"/><path d="M70 126q22-30 44-4" fill="#2a0f24"/><rect x="112" y="124" width="190" height="28" rx="14" fill="#e8386d"/><rect x="140" y="104" width="52" height="22" rx="11" fill="#d99a7a" class="hd"/><rect x="170" y="108" width="40" height="18" rx="9" fill="#c98a6b" class="hd"/><ellipse cx="345" cy="150" rx="22" ry="8" fill="#6b6b73" transform="translate(0 -4)"/><ellipse cx="345" cy="140" rx="16" ry="6" fill="#85858f"/><rect x="26" y="90" width="18" height="40" rx="3" fill="#fff1f4"/><path d="M35 70q-8 12 0 20q8-8 0-20" fill="#f4b45c" class="fk"/><g class="fl" fill="none" stroke="#fff" opacity=".5" stroke-width="3"><path d="M250 90q10-14 0-28q-10-14 0-28"/><path d="M280 96q10-14 0-28q-10-14 0-28"/></g>`,
 Celebrating:`<rect width="400" height="260" fill="#6b1c52"/><circle cx="200" cy="140" r="110" fill="#f4b45c" opacity=".18"/><path d="M150 210l12-90h-30zM250 210l-12-90h30z" fill="none"/><path d="M150 100h50l-10 70q-15 10-30 0z" fill="#ffe3a3"/><rect x="172" y="170" width="6" height="40" fill="#ffe3a3"/><rect x="158" y="208" width="34" height="6" rx="3" fill="#ffe3a3"/><path d="M214 100h50l-10 70q-15 10-30 0z" fill="#ffd0dc" transform="rotate(-10 239 135)"/><rect x="236" y="170" width="6" height="40" fill="#ffd0dc"/><rect x="222" y="208" width="34" height="6" rx="3" fill="#ffd0dc"/><g fill="#fff" class="fl"><circle cx="172" cy="130" r="4"/><circle cx="182" cy="150" r="3"/><circle cx="240" cy="132" r="4"/></g><g><rect class="cf" x="40" width="10" height="16" fill="#f4b45c"/><rect class="cf" x="110" width="10" height="16" fill="#ff6fa0" style="animation-delay:-1s"/><rect class="cf" x="290" width="10" height="16" fill="#7cffb2" style="animation-delay:-2s"/><rect class="cf" x="350" width="10" height="16" fill="#fff" style="animation-delay:-.5s"/><rect class="cf" x="210" width="10" height="16" fill="#8b3dff" style="animation-delay:-2.6s"/><rect class="cf" x="70" width="10" height="16" fill="#fff" style="animation-delay:-1.8s"/></g>`,
@@ -269,6 +297,15 @@ p.innerHTML=(ph?"":`<svg class="scn" viewBox="0 0 400 260" preserveAspectRatio="
 /* floating sparkles in the Come say hello card */
 (function(){const v=$("visit");for(let i=0;i<12;i++){const x=document.createElement("span");x.className="vp";x.textContent=["✨","💖","🌸"][i%3];
 x.style.cssText=`left:${Math.random()*95}%;font-size:${14+Math.random()*14}px;animation-duration:${5+Math.random()*5}s;animation-delay:${-Math.random()*8}s`;v.appendChild(x)}})();
+
+/* load your own media where the files exist */
+(function(){const M2=C.media;
+Object.entries(M2.moods||{}).forEach(([k,u])=>{const i=new Image();i.onload=()=>{C.photos[k]=u};i.src=u});
+Object.entries(M2.services||{}).forEach(([k,u])=>{const i=new Image();i.onload=()=>{SP[k]=u;show(curTab)};i.src=u});
+if(M2.logo){const i=new Image();i.onload=()=>{document.querySelector(".logo").innerHTML=`<img src="${M2.logo}" alt="Joy Beauty Parlour logo">`};i.src=M2.logo}
+if(M2.hello){window.probeMedia(M2.hello).then(e=>{if(!e)return;const v=$("visit");e.className="vbg";e.setAttribute("aria-hidden","true");
+if(e.tagName=="VIDEO"){e.muted=true;e.loop=true;e.autoplay=true;e.playsInline=true;e.play().catch(()=>{})}else{e.style.cssText="";e.removeAttribute("src");e.style.backgroundImage=`url("${M2.hello}")`;const d=document.createElement("div");d.className="vbg";d.style.backgroundImage=`url("${M2.hello}")`;v.prepend(d);return}
+v.prepend(e)})}})();
 </script>
 </body>
 </html>
